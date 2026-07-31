@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -10,6 +11,9 @@ class UpdateChecker {
       "https://script.google.com/macros/s/AKfycbx_6czLjzqVvXDyCjfS69XuqPSTtugZhWpF6p1md9Pb-AioWmF9mRcLnkWajeO9UdzumQ/exec?update=true";
 
   static Future<bool> check(BuildContext context) async {
+    // The update flow serves an APK link, which only Android can install.
+    if (defaultTargetPlatform != TargetPlatform.android) return false;
+
     try {
       final response = await http.get(Uri.parse(url));
 
