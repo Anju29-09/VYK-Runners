@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
+import '../../widgets/app_back_button.dart';
 import 'player_profile_screen.dart';
 
 class PlayerDetailsScreen extends StatefulWidget {
@@ -706,6 +708,8 @@ class _PlayerDetailsScreenState
             const EdgeInsets.all(20),
 
             children: [
+
+              const AppBackButton(),
 
               const Text(
 

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../widgets/app_back_button.dart';
+
 class PlayerFeesScreen extends StatefulWidget {
   final String playerName;
   final String playerEmail;
@@ -75,8 +77,8 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xffF7F1EB),
 
-      // No AppBar.
-      // Therefore no top bar and no back arrow.
+      // No AppBar, to keep the decorative background unbroken.
+      // The back arrow is the AppBackButton at the top of the content.
 
       body: Stack(
         children: [
@@ -128,7 +130,7 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 10),
+                    const AppBackButton(),
 
                     // ------------------------------------------------
                     // TITLE

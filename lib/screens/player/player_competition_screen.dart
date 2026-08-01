@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../widgets/app_back_button.dart';
+
 class PlayerCompetitionScreen extends StatefulWidget {
 
   final String playerName;
@@ -457,7 +459,7 @@ class _PlayerCompetitionScreenState
 
                   children: [
 
-                    const SizedBox(height: 10),
+                    const AppBackButton(),
 
                     // TITLE
 

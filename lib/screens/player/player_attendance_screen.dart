@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/app_colors.dart';
+import '../../widgets/app_back_button.dart';
 
 class PlayerAttendanceScreen extends StatefulWidget {
   final String playerName;
@@ -171,7 +172,7 @@ class _PlayerAttendanceScreenState
 
                   children: [
 
-                    const SizedBox(height: 10),
+                    const AppBackButton(),
 
                     const Text(
                       "My Attendance",

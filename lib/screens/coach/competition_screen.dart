@@ -4,6 +4,7 @@ import '../../core/app_colors.dart';
 import '../../models/competition_model.dart';
 import '../../models/player_model.dart';
 import '../../services/player_service.dart';
+import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
 
 class PlayerCompetitionEntry {
@@ -830,6 +831,8 @@ class _CompetitionScreenState
               padding: const EdgeInsets.all(20),
 
               children: [
+
+                const AppBackButton(),
 
                 const Text(
                   "Competition Management",

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/salary_model.dart';
 import '../../services/player_service.dart';
+import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
 
 class SalaryScreen extends StatefulWidget {
@@ -548,6 +549,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
               const EdgeInsets.all(20),
 
               children: [
+
+                const AppBackButton(),
 
                 const Text(
 

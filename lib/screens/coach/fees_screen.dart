@@ -4,6 +4,7 @@ import '../../core/app_colors.dart';
 import '../../models/player_model.dart';
 import '../../models/fee_model.dart';
 import '../../services/player_service.dart';
+import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
 import '../../widgets/month_year_picker.dart';
 
@@ -168,6 +169,8 @@ Widget build(BuildContext context) {
                     padding: const EdgeInsets.all(20),
 
                     children: [
+
+                      const AppBackButton(),
 
                       const Text(
                         "Fees Management",

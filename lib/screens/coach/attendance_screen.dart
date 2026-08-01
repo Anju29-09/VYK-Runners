@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../models/player_model.dart';
 import '../../services/player_service.dart';
+import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
 
 class PlayerAttendance {
@@ -297,6 +298,8 @@ class _AttendanceScreenState
                 : ListView(
               padding: const EdgeInsets.all(20),
               children: [
+
+                const AppBackButton(),
 
                 const Text(
                   "Attendance",
