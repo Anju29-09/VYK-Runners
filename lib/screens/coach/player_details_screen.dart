@@ -317,80 +317,21 @@ class _PlayerDetailsScreenState
 
   Widget buildStatistics() {
 
-    final Map<String, int> counts = {};
+    // Only the overall total. There was a card per group here as well,
+    // but every group card below already carries its own count in the
+    // badge beside its name.
+    return SizedBox(
 
-    for (final player in players) {
+      width: double.infinity,
 
-      final group =
-      playerGroup(player);
+      // Matches the height the cards had in the old two column grid.
+      height: 110,
 
-      counts[group] =
-          (counts[group] ?? 0) + 1;
-
-    }
-
-    final List<Color> colors = [
-
-      const Color(0xff312C51),
-      const Color(0xff48426D),
-      const Color(0xffF0C38E),
-      const Color(0xffF1AA9B),
-      const Color(0xff8B7AA8),
-      const Color(0xffD8C3A5),
-      const Color(0xffA68DAD),
-
-    ];
-
-    final List<Widget> cards = [];
-
-    // Total Players
-
-    cards.add(
-      buildStatCard(
+      child: buildStatCard(
         "Total Players",
         players.length,
-        colors[0],
+        const Color(0xff312C51),
       ),
-    );
-
-    int colorIndex = 1;
-
-    counts.forEach((group, count) {
-
-      cards.add(
-        buildStatCard(
-          group,
-          count,
-          colors[
-          colorIndex %
-              colors.length
-          ],
-        ),
-      );
-
-      colorIndex++;
-
-    });
-
-    return GridView.count(
-
-      crossAxisCount:
-      MediaQuery.of(context).size.width > 600
-          ? 3
-          : 2,
-
-      shrinkWrap: true,
-
-      physics:
-      const NeverScrollableScrollPhysics(),
-
-      crossAxisSpacing: 10,
-
-      mainAxisSpacing: 10,
-
-      childAspectRatio: 1.6,
-
-      children: cards,
 
     );
 
