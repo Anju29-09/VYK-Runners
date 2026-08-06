@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../coach/coach_dashboard.dart';
 import '../login/login_screen.dart';
 import '../player/player_dashboard.dart';
+import '../../services/player_service.dart';
 import '../../services/update_checker.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -24,19 +27,28 @@ class _SplashScreenState
   }
 
   Future<void> _start() async {
-    await Future.delayed(
-      const Duration(seconds: 2),
+    // Fired and left to run. Waiting on it here cost every launch the four
+    // to twelve seconds the Apps Script takes to answer.
+    unawaited(UpdateChecker.checkInBackground());
+
+    // Pulls every list down in one request while the logo is still up, so
+    // the dashboard cards open against a warm cache instead of each one
+    // starting its own two second wait. Failure is fine; the screens fall
+    // back to fetching for themselves.
+    unawaited(
+      PlayerService().prefetchAll().catchError((Object e) {
+        debugPrint("Prefetch failed: $e");
+      }),
     );
 
-    bool updateAvailable =
-    await UpdateChecker.check(context);
+    final prefsFuture = SharedPreferences.getInstance();
 
-    if (updateAvailable) {
-      return;
-    }
+    // Long enough to read the logo, rather than a fixed two second wait.
+    await Future.delayed(
+      const Duration(milliseconds: 900),
+    );
 
-    final prefs =
-    await SharedPreferences.getInstance();
+    final prefs = await prefsFuture;
 
     bool isLoggedIn =
         prefs.getBool("isLoggedIn") ?? false;

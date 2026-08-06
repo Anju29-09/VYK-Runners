@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 
 class PlayerFeesScreen extends StatefulWidget {
@@ -22,6 +21,8 @@ class PlayerFeesScreen extends StatefulWidget {
 }
 
 class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
+  final PlayerService service = PlayerService();
+
   final TextEditingController monthlyFeeController =
   TextEditingController();
 
@@ -46,6 +47,12 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
   ];
 
   bool isLoading = false;
+
+  /// Monthly Fee only matters when one payment is split across several
+  /// months, because that is the figure each month is measured against.
+  /// For a single month the amount entered says everything, so the field
+  /// stays optional.
+  bool get isMonthlyFeeRequired => selectedMonths.length > 1;
 
   // Empty initially.
   // Saved data will only be displayed after selecting a month.
@@ -165,7 +172,9 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
                       controller: monthlyFeeController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        hintText: "Monthly Fee",
+                        hintText: isMonthlyFeeRequired
+                            ? "Monthly Fee"
+                            : "Monthly Fee (optional)",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -591,39 +600,48 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
   // ---------------------------------------------------------
 
   Future<void> _saveFees() async {
-    if (monthlyFeeController.text.trim().isEmpty) {
-      _showMessage("Enter Monthly Fee");
-      return;
-    }
-
     if (amountController.text.trim().isEmpty) {
       _showMessage("Enter Amount");
       return;
     }
 
+    // Checked before Monthly Fee, because how many months are selected
+    // decides whether Monthly Fee is required at all.
     if (selectedMonths.isEmpty) {
       _showMessage("Select Month");
       return;
     }
 
-    final double? monthlyFee =
-    double.tryParse(
-      monthlyFeeController.text.trim(),
-    );
+    final String monthlyFeeText =
+    monthlyFeeController.text.trim();
+
+    if (monthlyFeeText.isEmpty && isMonthlyFeeRequired) {
+      _showMessage(
+        "Enter Monthly Fee when selecting more than one month",
+      );
+      return;
+    }
 
     final double? totalAmount =
     double.tryParse(
       amountController.text.trim(),
     );
 
-    if (monthlyFee == null || monthlyFee <= 0) {
-      _showMessage("Enter a valid Monthly Fee");
-      return;
-    }
-
     if (totalAmount == null || totalAmount <= 0) {
       _showMessage("Enter a valid Amount");
       return;
+    }
+
+    // Null when left blank for a single month.
+    double? monthlyFee;
+
+    if (monthlyFeeText.isNotEmpty) {
+      monthlyFee = double.tryParse(monthlyFeeText);
+
+      if (monthlyFee == null || monthlyFee <= 0) {
+        _showMessage("Enter a valid Monthly Fee");
+        return;
+      }
     }
 
     // ---------------------------------------------------------
@@ -660,8 +678,11 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
             "type": "saveFees",
             "month": dbMonth,
 
-            "monthlyFee":
-            monthlyFee.toStringAsFixed(2),
+            // Sent empty when left blank, so nothing is invented for a
+            // player who only recorded what they paid.
+            "monthlyFee": monthlyFee == null
+                ? ""
+                : monthlyFee.toStringAsFixed(2),
 
             // IMPORTANT:
             // Save per-month amount, not total amount.
@@ -687,6 +708,10 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
 
         debugPrint(response.body);
       }
+
+      // Posted directly rather than through the service, so the cached
+      // fee list has to be dropped by hand.
+      PlayerService.invalidateFees();
 
       monthlyFeeController.clear();
       amountController.clear();
@@ -741,15 +766,9 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse("$url?fees=true"),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception("HTTP ${response.statusCode}");
-      }
-
-      final List<dynamic> data = jsonDecode(response.body);
+      // Shared cache, so switching between months does not re-download
+      // the same list each time.
+      final List<dynamic> data = await service.getFeesRaw();
 
       final List<Map<String, dynamic>> records = [];
 
@@ -908,14 +927,17 @@ class _PlayerFeesScreenState extends State<PlayerFeesScreen> {
           // -------------------------------------------------------
 
           if (isPaid) ...[
-            Text(
-              "Monthly Fee : ₹$monthlyFee",
-              style: const TextStyle(
-                fontSize: 16,
+            // Blank whenever a single month was saved without one.
+            if (monthlyFee.trim().isNotEmpty) ...[
+              Text(
+                "Monthly Fee : ₹$monthlyFee",
+                style: const TextStyle(
+                  fontSize: 16,
+                ),
               ),
-            ),
 
-            const SizedBox(height: 6),
+              const SizedBox(height: 6),
+            ],
 
             Text(
               "Paid Amount : ₹$paidAmount",

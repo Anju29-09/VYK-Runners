@@ -39,13 +39,15 @@ class _SalaryScreenState extends State<SalaryScreen> {
     loadSalary();
   }
 
-  Future<void> loadSalary() async {
+  Future<void> loadSalary({bool refresh = false}) async {
 
-    salaries = await service.getSalary();
+    salaries = await service.getSalary(refresh: refresh);
 
     if (selectedViewMonth != null) {
       filterSalary();
     }
+
+    if (!mounted) return;
 
     setState(() {
       loading = false;
@@ -534,7 +536,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
           child: RefreshIndicator(
 
-            onRefresh: loadSalary,
+            onRefresh: () => loadSalary(refresh: true),
 
             child: loading
 

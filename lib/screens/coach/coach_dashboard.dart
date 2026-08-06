@@ -50,6 +50,12 @@ class CoachDashboard extends StatelessWidget {
                 image,
                 width: 72,
                 height: 72,
+
+                // These files are up to 1254px square but never drawn
+                // larger than 72. Without this they are decoded at full
+                // size, which is slow and holds megabytes per icon.
+                cacheWidth: 216,
+                cacheHeight: 216,
               ),
 
               const SizedBox(width: 18),

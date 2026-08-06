@@ -52,6 +52,11 @@ class PlayerDashboard extends StatelessWidget {
                 image,
                 width: 72,
                 height: 72,
+
+                // Decoded at roughly the size actually drawn rather than
+                // the source file's full resolution.
+                cacheWidth: 216,
+                cacheHeight: 216,
               ),
 
               const SizedBox(width: 18),

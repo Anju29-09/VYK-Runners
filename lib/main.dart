@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'core/navigation.dart';
 import 'screens/splash/splash_screen.dart';
 
 void main() {
@@ -12,6 +14,7 @@ class VYKRunnersApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'VYK Runners',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

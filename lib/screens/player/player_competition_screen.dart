@@ -1,8 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
+import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 
 class PlayerCompetitionScreen extends StatefulWidget {
@@ -27,8 +25,7 @@ class _PlayerCompetitionScreenState
   // GOOGLE APPS SCRIPT URL
   // -------------------------------------------------------
 
-  final String url =
-      "https://script.google.com/macros/s/AKfycbx_6czLjzqVvXDyCjfS69XuqPSTtugZhWpF6p1md9Pb-AioWmF9mRcLnkWajeO9UdzumQ/exec";
+  final PlayerService service = PlayerService();
 
   // -------------------------------------------------------
   // VARIABLES
@@ -57,7 +54,7 @@ class _PlayerCompetitionScreenState
   // LOAD COMPETITIONS
   // -------------------------------------------------------
 
-  Future<void> _loadCompetitions() async {
+  Future<void> _loadCompetitions({bool refresh = false}) async {
 
     if (mounted) {
 
@@ -69,36 +66,18 @@ class _PlayerCompetitionScreenState
 
     try {
 
-      final response =
-      await http.get(
-        Uri.parse("$url?competition=true"),
-      );
+      // Shared cache, so re-opening this screen within a few minutes
+      // costs nothing.
+      final data =
+      await service.getCompetitionsRaw(refresh: refresh);
 
-      if (response.statusCode == 200) {
+      if (mounted) {
 
-        final data =
-        jsonDecode(response.body);
+        setState(() {
 
-        if (data is List) {
+          competitionArray = data;
 
-          if (mounted) {
-
-            setState(() {
-
-              competitionArray =
-                  data;
-
-            });
-
-          }
-
-        }
-
-      } else {
-
-        _showMessage(
-          "Network issue. Pull down to refresh.",
-        );
+        });
 
       }
 
@@ -442,7 +421,7 @@ class _PlayerCompetitionScreenState
 
             child: RefreshIndicator(
 
-              onRefresh: _loadCompetitions,
+              onRefresh: () => _loadCompetitions(refresh: true),
 
               child: SingleChildScrollView(
 

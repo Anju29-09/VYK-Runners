@@ -1,8 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
+import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 import 'player_profile_screen.dart';
 
@@ -18,15 +16,10 @@ class _PlayerDetailsScreenState
     extends State<PlayerDetailsScreen> {
 
   // ============================================================
-  // GOOGLE APPS SCRIPT URL
-  // ============================================================
-
-  final String url =
-      "https://script.google.com/macros/s/AKfycbx_6czLjzqVvXDyCjfS69XuqPSTtugZhWpF6p1md9Pb-AioWmF9mRcLnkWajeO9UdzumQ/exec";
-
-  // ============================================================
   // DATA
   // ============================================================
+
+  final PlayerService service = PlayerService();
 
   List<dynamic> players = [];
 
@@ -45,7 +38,7 @@ class _PlayerDetailsScreenState
     loadPlayers();
   }
 
-  Future<void> loadPlayers() async {
+  Future<void> loadPlayers({bool refresh = false}) async {
 
     setState(() {
       loading = true;
@@ -53,47 +46,32 @@ class _PlayerDetailsScreenState
 
     try {
 
-      final response = await http
-          .get(Uri.parse(url))
+      // Shared with the attendance, fees and competition screens, so
+      // whichever one is opened first pays for the request and the rest
+      // read it straight from the cache.
+      final data = await service
+          .getPlayersRaw(refresh: refresh)
           .timeout(
         const Duration(seconds: 20),
       );
 
-      if (response.statusCode == 200) {
+      if (!mounted) return;
 
-        final data = jsonDecode(response.body);
+      setState(() {
 
-        if (data is List) {
+        players = data;
 
-          setState(() {
+        loading = false;
 
-            players = data;
-
-            loading = false;
-
-          });
-
-        } else {
-
-          throw Exception("Invalid server response");
-
-        }
-
-      } else {
-
-        throw Exception(
-          "Server error: ${response.statusCode}",
-        );
-
-      }
+      });
 
     } catch (e) {
+
+      if (!mounted) return;
 
       setState(() {
         loading = false;
       });
-
-      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -186,19 +164,17 @@ class _PlayerDetailsScreenState
 
     try {
 
-      final response = await http
-          .post(
-        Uri.parse(url),
-        body: {
-          "type": "deletePlayer",
-          "id": id,
-        },
-      )
+      // Through the service so the shared player cache is dropped and the
+      // other screens do not keep showing the deleted player.
+      final deleted = await service
+          .deletePlayer(id)
           .timeout(
         const Duration(seconds: 20),
       );
 
-      if (response.statusCode == 200) {
+      if (deleted) {
+
+        if (!mounted) return;
 
         setState(() {
 
@@ -693,7 +669,7 @@ class _PlayerDetailsScreenState
 
         child: RefreshIndicator(
 
-          onRefresh: loadPlayers,
+          onRefresh: () => loadPlayers(refresh: true),
 
           child: loading
 

@@ -5,6 +5,7 @@ import '../../models/player_model.dart';
 import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
+import '../../widgets/player_search_field.dart';
 
 class PlayerAttendance {
   final PlayerModel player;
@@ -45,6 +46,11 @@ class _AttendanceScreenState
   bool saving = false;
   bool loadingAttendance = false;
 
+  final TextEditingController historySearchController =
+  TextEditingController();
+
+  String historySearch = "";
+
   @override
   void initState() {
     super.initState();
@@ -52,34 +58,81 @@ class _AttendanceScreenState
     loadPlayers();
   }
 
-  Future<void> loadPlayers() async {
+  @override
+  void dispose() {
+    historySearchController.dispose();
+    super.dispose();
+  }
+
+  /// Saved attendance for the picked date, narrowed to the searched player.
+  List<dynamic> get visibleHistory {
+
+    final query = historySearch.trim().toLowerCase();
+
+    if (query.isEmpty) return attendanceHistory;
+
+    return attendanceHistory.where((item) {
+
+      final name =
+      (item["Player Name"] ?? "").toString().toLowerCase();
+
+      return name.contains(query);
+
+    }).toList();
+
+  }
+
+  void clearHistorySearch() {
+    historySearchController.clear();
+    historySearch = "";
+  }
+
+  Future<void> loadPlayers({bool refresh = false}) async {
 
     setState(() {
       loading = true;
     });
 
-    players = await service.getPlayers();
+    try {
+      players = await service.getPlayers(refresh: refresh);
 
-    groupedPlayers.clear();
+      groupedPlayers.clear();
 
-    for(final player in players){
+      for(final player in players){
 
-      groupedPlayers.putIfAbsent(
-        player.group,
-            ()=>[],
-      );
+        groupedPlayers.putIfAbsent(
+          player.group,
+              ()=>[],
+        );
 
-      groupedPlayers[player.group]!.add(
+        groupedPlayers[player.group]!.add(
 
-        PlayerAttendance(player: player),
+          PlayerAttendance(player: player),
 
-      );
+        );
 
+      }
+    } catch (e) {
+      debugPrint("Load players error: $e");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Unable to load players. Pull down to refresh.",
+            ),
+          ),
+        );
+      }
     }
 
-    setState(() {
-      loading = false;
-    });
+    // Runs even when the load failed, so a network problem cannot leave
+    // the spinner turning forever.
+    if (mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
 
   }
 
@@ -183,6 +236,8 @@ class _AttendanceScreenState
 
     historyDate = null;
 
+    clearHistorySearch();
+
     setState(() {});
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -268,6 +323,9 @@ class _AttendanceScreenState
 
     setState(() {
       loadingAttendance = true;
+
+      // A search from the previous date should not hide the new one.
+      clearHistorySearch();
     });
 
     String date =
@@ -275,12 +333,31 @@ class _AttendanceScreenState
         "${historyDate!.month.toString().padLeft(2, '0')}-"
         "${historyDate!.year}";
 
-    attendanceHistory =
-    await service.getAttendance(date);
+    try {
+      // The full list is cached, so picking a second date is instant.
+      attendanceHistory =
+      await service.getAttendance(date);
+    } catch (e) {
+      debugPrint("Load attendance error: $e");
 
-    setState(() {
-      loadingAttendance = false;
-    });
+      attendanceHistory = [];
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Unable to load attendance. Pull down to refresh.",
+            ),
+          ),
+        );
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        loadingAttendance = false;
+      });
+    }
 
   }
 
@@ -290,7 +367,7 @@ class _AttendanceScreenState
       body: Background(
         child: SafeArea(
           child: RefreshIndicator(
-            onRefresh: loadPlayers,
+            onRefresh: () => loadPlayers(refresh: true),
             child: loading
                 ? const Center(
               child: CircularProgressIndicator(),
@@ -516,6 +593,22 @@ class _AttendanceScreenState
                   },
                 ),
 
+                // Only useful once a date has actually loaded records.
+                if (!loadingAttendance && attendanceHistory.isNotEmpty) ...[
+
+                  const SizedBox(height: 5),
+
+                  PlayerSearchField(
+                    controller: historySearchController,
+                    onChanged: (value) {
+                      setState(() {
+                        historySearch = value;
+                      });
+                    },
+                  ),
+
+                ],
+
                 const SizedBox(height: 20),
 
                 if (loadingAttendance)
@@ -564,9 +657,20 @@ class _AttendanceScreenState
                   Builder(
                     builder: (context) {
 
+                      final records = visibleHistory;
+
+                      final bool searching =
+                          historySearch.trim().isNotEmpty;
+
+                      if (records.isEmpty) {
+                        return NoSearchResults(
+                          query: historySearch.trim(),
+                        );
+                      }
+
                       Map<String, List<dynamic>> groupedAttendance = {};
 
-                      for (var item in attendanceHistory) {
+                      for (var item in records) {
 
                         String group = item["Group"];
 
@@ -590,6 +694,16 @@ class _AttendanceScreenState
                             margin: const EdgeInsets.only(bottom: 15),
 
                             child: ExpansionTile(
+
+                              // Rebuilds the tile when the search starts or
+                              // ends, so `initiallyExpanded` takes effect.
+                              key: ValueKey(
+                                "attendance-${entry.key}-$searching",
+                              ),
+
+                              // Searching should reveal the match straight
+                              // away instead of making the coach tap open.
+                              initiallyExpanded: searching,
 
                               title: Text(
 

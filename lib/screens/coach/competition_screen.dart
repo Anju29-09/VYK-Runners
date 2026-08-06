@@ -6,6 +6,7 @@ import '../../models/player_model.dart';
 import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
+import '../../widgets/player_search_field.dart';
 
 class PlayerCompetitionEntry {
 
@@ -64,31 +65,98 @@ class _CompetitionScreenState
 
   final Map<String, bool> savedGroupExpanded = {};
 
+  final TextEditingController savedSearchController =
+  TextEditingController();
+
+  String savedSearch = "";
+
   @override
   void initState() {
     super.initState();
     loadData();
   }
 
+  @override
+  void dispose() {
+    savedSearchController.dispose();
+    super.dispose();
+  }
 
-  Future<void> loadData() async {
+  /// Saved competitions for the picked date, narrowed to the searched
+  /// player. Groups with no match are dropped so no empty sections remain.
+  Map<String, List<CompetitionModel>> get visibleCompetitions {
+
+    final query = savedSearch.trim().toLowerCase();
+
+    if (query.isEmpty) return groupedCompetitions;
+
+    final Map<String, List<CompetitionModel>> result = {};
+
+    groupedCompetitions.forEach((group, list) {
+
+      final matches = list
+          .where((item) => item.player.toLowerCase().contains(query))
+          .toList();
+
+      if (matches.isNotEmpty) {
+        result[group] = matches;
+      }
+
+    });
+
+    return result;
+
+  }
+
+
+  Future<void> loadData({bool refresh = false}) async {
     setState(() {
       loading = true;
     });
 
-    players = await service.getPlayers();
+    try {
+      // Three separate round trips of two to three seconds each. Awaiting
+      // them one by one meant waiting for the sum; Future.wait overlaps
+      // them so the screen only waits for the slowest.
+      final results = await Future.wait<dynamic>([
+        service.getPlayers(refresh: refresh),
+        service.getCompetitions(refresh: refresh),
+        service.getEvents(refresh: refresh),
+      ]);
 
-    competitions = await service.getCompetitions();
+      players = (results[0] as List).cast<PlayerModel>();
 
-    events = await service.getEvents();
+      competitions =
+          (results[1] as List).cast<CompetitionModel>();
 
-    print(events);
+      events = (results[2] as List).cast<String>();
 
-    groupPlayers();
+      groupPlayers();
 
-    setState(() {
-      loading = false;
-    });
+      if (selectedSavedDate != null) {
+        buildSavedCompetition();
+      }
+    } catch (e) {
+      debugPrint("Load competition data error: $e");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Unable to load. Pull down to refresh.",
+            ),
+          ),
+        );
+      }
+    }
+
+    // Runs even when the load failed, so a network problem cannot leave
+    // the spinner turning forever.
+    if (mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
   }
 
   void groupPlayers() {
@@ -152,6 +220,10 @@ class _CompetitionScreenState
     if (picked == null) return;
 
     selectedSavedDate = picked;
+
+    // A search from the previous date should not hide the new one.
+    savedSearchController.clear();
+    savedSearch = "";
 
     buildSavedCompetition();
 
@@ -615,11 +687,41 @@ class _CompetitionScreenState
 
     }
 
+    final visible = visibleCompetitions;
+
+    final bool searching = savedSearch.trim().isNotEmpty;
+
     return Column(
 
-      children:
+      crossAxisAlignment: CrossAxisAlignment.stretch,
 
-      groupedCompetitions.entries.map((group){
+      children: [
+
+        PlayerSearchField(
+
+          controller: savedSearchController,
+
+          onChanged: (value){
+
+            setState(() {
+              savedSearch = value;
+            });
+
+          },
+
+        ),
+
+        const SizedBox(height:20),
+
+        if(visible.isEmpty)
+
+          NoSearchResults(
+            query: savedSearch.trim(),
+          )
+
+        else
+
+          ...visible.entries.map((group){
 
         return Card(
 
@@ -627,6 +729,15 @@ class _CompetitionScreenState
           const EdgeInsets.only(bottom:15),
 
           child: ExpansionTile(
+
+            // Rebuilds the tile when the search starts or ends, so the
+            // expanded state below takes effect.
+            key: ValueKey(
+              "competition-${group.key}-$searching",
+            ),
+
+            // Searching should reveal the match without another tap.
+            initiallyExpanded: searching,
 
             title: Text(
 
@@ -655,7 +766,9 @@ class _CompetitionScreenState
 
         );
 
-      }).toList(),
+          }),
+
+      ],
 
     );
 
@@ -818,7 +931,7 @@ class _CompetitionScreenState
 
           child: RefreshIndicator(
 
-            onRefresh: loadData,
+            onRefresh: () => loadData(refresh: true),
 
             child: loading
 

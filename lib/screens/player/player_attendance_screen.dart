@@ -1,9 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
-import '../../core/app_colors.dart';
+import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 
 class PlayerAttendanceScreen extends StatefulWidget {
@@ -22,8 +19,7 @@ class PlayerAttendanceScreen extends StatefulWidget {
 class _PlayerAttendanceScreenState
     extends State<PlayerAttendanceScreen> {
 
-  final String url =
-      "https://script.google.com/macros/s/AKfycbx_6czLjzqVvXDyCjfS69XuqPSTtugZhWpF6p1md9Pb-AioWmF9mRcLnkWajeO9UdzumQ/exec?attendance=true";
+  final PlayerService service = PlayerService();
 
   List attendanceList = [];
 
@@ -37,15 +33,16 @@ class _PlayerAttendanceScreenState
     loadAttendance();
   }
 
-  Future<void> loadAttendance() async {
+  Future<void> loadAttendance({bool refresh = false}) async {
     setState(() {
       loading = true;
     });
 
     try {
-      final response = await http.get(Uri.parse(url));
-
-      attendanceList = jsonDecode(response.body);
+      // Shared cache, so re-opening this screen within a few minutes
+      // costs nothing.
+      attendanceList =
+      await service.getAllAttendance(refresh: refresh);
 
     } catch (e) {
       if (mounted) {
@@ -156,7 +153,7 @@ class _PlayerAttendanceScreenState
 
             child: RefreshIndicator(
 
-              onRefresh: loadAttendance,
+              onRefresh: () => loadAttendance(refresh: true),
 
               child: SingleChildScrollView(
 

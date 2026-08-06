@@ -7,6 +7,7 @@ import '../../services/player_service.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/background.dart';
 import '../../widgets/month_year_picker.dart';
+import '../../widgets/player_search_field.dart';
 
 class FeesScreen extends StatefulWidget {
   const FeesScreen({super.key});
@@ -31,6 +32,11 @@ class _FeesScreenState extends State<FeesScreen> {
 
   int totalFees = 0;
 
+  final TextEditingController searchController =
+  TextEditingController();
+
+  String search = "";
+
   @override
   void initState() {
     super.initState();
@@ -38,19 +44,82 @@ class _FeesScreenState extends State<FeesScreen> {
     loadData();
   }
 
-  Future<void> loadData() async {
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  /// Saved fees for the picked month, narrowed to the searched player.
+  ///
+  /// Groups with no matching player are dropped entirely so the coach is
+  /// not left tapping through empty sections.
+  Map<String, List<FeeModel>> get visibleFees {
+
+    final query = search.trim().toLowerCase();
+
+    if (query.isEmpty) return groupedFees;
+
+    final Map<String, List<FeeModel>> result = {};
+
+    groupedFees.forEach((group, list) {
+
+      final matches = list
+          .where((fee) => fee.player.toLowerCase().contains(query))
+          .toList();
+
+      if (matches.isNotEmpty) {
+        result[group] = matches;
+      }
+
+    });
+
+    return result;
+
+  }
+
+  Future<void> loadData({bool refresh = false}) async {
 
     setState(() {
       loading = true;
     });
 
-    players = await service.getPlayers();
+    try {
+      // Two round trips of two to three seconds each. Awaiting them one by
+      // one meant waiting for the sum; Future.wait overlaps them.
+      final results = await Future.wait<dynamic>([
+        service.getPlayers(refresh: refresh),
+        service.getFees(refresh: refresh),
+      ]);
 
-    fees = await service.getFees();
+      players = (results[0] as List).cast<PlayerModel>();
 
-    setState(() {
-      loading = false;
-    });
+      fees = (results[1] as List).cast<FeeModel>();
+
+      if (selectedMonth != null) {
+        buildMonthData();
+      }
+    } catch (e) {
+      debugPrint("Load fees data error: $e");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Unable to load. Pull down to refresh.",
+            ),
+          ),
+        );
+      }
+    }
+
+    // Runs even when the load failed, so a network problem cannot leave
+    // the spinner turning forever.
+    if (mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
 
   }
 
@@ -85,6 +154,10 @@ class _FeesScreenState extends State<FeesScreen> {
       picked.year,
       picked.month,
     );
+
+    // A search from the previous month should not hide the new one.
+    searchController.clear();
+    search = "";
 
     buildMonthData();
 
@@ -156,7 +229,7 @@ Widget build(BuildContext context) {
 
           child: RefreshIndicator(
 
-            onRefresh: loadData,
+            onRefresh: () => loadData(refresh: true),
 
             child: loading
 
@@ -380,56 +453,95 @@ Widget build(BuildContext context) {
 
                         )
 
-                      else
+                      else ...[
 
-                        ...groupedFees.entries.map(
+                        PlayerSearchField(
 
-                              (entry){
+                          controller: searchController,
 
-                                return Card(
+                          onChanged: (value){
 
-                                  margin:
-                                      const EdgeInsets.only(
-                                        bottom:15,
+                            setState(() {
+                              search = value;
+                            });
+
+                          },
+
+                        ),
+
+                        const SizedBox(height:20),
+
+                        if(visibleFees.isEmpty)
+
+                          NoSearchResults(
+                            query: search.trim(),
+                          )
+
+                        else
+
+                          ...visibleFees.entries.map(
+
+                                (entry){
+
+                                  return Card(
+
+                                    margin:
+                                        const EdgeInsets.only(
+                                          bottom:15,
+                                        ),
+
+                                    child: ExpansionTile(
+
+                                      // Rebuilds the tile when the search
+                                      // starts or ends, so the expanded
+                                      // state below takes effect.
+                                      key: ValueKey(
+                                        "fees-${entry.key}-"
+                                        "${search.trim().isNotEmpty}",
                                       ),
 
-                                  child: ExpansionTile(
+                                      // Searching should reveal the match
+                                      // without another tap.
+                                      initiallyExpanded:
+                                          search.trim().isNotEmpty,
 
-                                    title: Text(
+                                      title: Text(
 
-                                      entry.key,
+                                        entry.key,
 
-                                      style: const TextStyle(
+                                        style: const TextStyle(
 
-                                        fontWeight:
-                                            FontWeight.bold,
+                                          fontWeight:
+                                              FontWeight.bold,
 
-                                        color:
-                                            AppColors.primary,
+                                          color:
+                                              AppColors.primary,
+
+                                        ),
 
                                       ),
+
+                                      children:
+
+                                          entry.value.map(
+
+                                                (fee){
+
+                                                  return buildFeeCard(fee);
+
+                                                  },
+
+                                          ).toList(),
 
                                     ),
 
-                                    children:
+                                  );
 
-                                        entry.value.map(
+                                  },
 
-                                              (fee){
+                          ),
 
-                                                return buildFeeCard(fee);
-
-                                                },
-
-                                        ).toList(),
-
-                                  ),
-
-                                );
-
-                                },
-
-                        ),
+                      ],
 
                       const SizedBox(height:80),
 
@@ -492,7 +604,9 @@ Widget build(BuildContext context) {
 
           const SizedBox(height:8),
 
-          Text("Monthly Fee : ₹${fee.monthlyFee}"),
+          // Blank when a player saved a single month without one.
+          if(fee.monthlyFee.trim().isNotEmpty)
+            Text("Monthly Fee : ₹${fee.monthlyFee}"),
 
           Text("Paid Amount : ₹${fee.amount}"),
 
