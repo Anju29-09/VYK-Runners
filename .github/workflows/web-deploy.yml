@@ -1,0 +1,68 @@
+name: Deploy Web App
+
+# Publishes the Flutter web build to GitHub Pages so the app can be opened
+# from a link on any device - including iPhones, which cannot install the
+# APK. Runs on every push to main, so the hosted app is never out of date.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; the newest push wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # enablement turns Pages on for the repository the first time this
+      # runs, so no manual switch has to be flipped in Settings.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # The site is served from /VYK-Runners/ rather than the domain root,
+      # so the base href has to match or every asset request 404s.
+      - name: Build web release
+        run: flutter build web --release --base-href /VYK-Runners/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

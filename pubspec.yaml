@@ -77,6 +77,13 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/images/VYK Runners Logo.png"
     icon_size: 256
+  # Drives the icon shown when someone adds the web app to an iPhone or
+  # Android home screen, so it matches the installed app.
+  web:
+    generate: true
+    image_path: "assets/images/VYK Runners Logo.png"
+    background_color: "#312C51"
+    theme_color: "#312C51"
 
   # To add assets to your application, add an assets section, like this:
   # assets:

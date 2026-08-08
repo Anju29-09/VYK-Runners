@@ -1,11 +1,11 @@
 {
-    "name": "vykrunners_flutter",
-    "short_name": "vykrunners_flutter",
+    "name": "VYK Runners",
+    "short_name": "VYK Runners",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#312C51",
+    "theme_color": "#312C51",
+    "description": "Running club management for VYK Runners coaches and players.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
