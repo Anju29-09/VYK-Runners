@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../coach/coach_dashboard.dart';
 import '../login/login_screen.dart';
 import '../player/player_dashboard.dart';
+import '../../services/auth_service.dart';
 import '../../services/player_service.dart';
 import '../../services/update_checker.dart';
 
@@ -31,17 +32,26 @@ class _SplashScreenState
     // to twelve seconds the Apps Script takes to answer.
     unawaited(UpdateChecker.checkInBackground());
 
+    final prefsFuture = SharedPreferences.getInstance();
+
+    // The saved token has to be in hand before anything is requested,
+    // otherwise the prefetch goes out unsigned and comes back refused.
+    await AuthService.load();
+
     // Pulls every list down in one request while the logo is still up, so
     // the dashboard cards open against a warm cache instead of each one
     // starting its own two second wait. Failure is fine; the screens fall
     // back to fetching for themselves.
-    unawaited(
-      PlayerService().prefetchAll().catchError((Object e) {
-        debugPrint("Prefetch failed: $e");
-      }),
-    );
-
-    final prefsFuture = SharedPreferences.getInstance();
+    //
+    // Skipped when signed out, because the server would only refuse it and
+    // there is nothing to warm up before the login screen anyway.
+    if (AuthService.token != null) {
+      unawaited(
+        PlayerService().prefetchAll().catchError((Object e) {
+          debugPrint("Prefetch failed: $e");
+        }),
+      );
+    }
 
     // Long enough to read the logo, rather than a fixed two second wait.
     await Future.delayed(
@@ -50,8 +60,13 @@ class _SplashScreenState
 
     final prefs = await prefsFuture;
 
+    // A session from before this update has the logged in flag but no
+    // token, and every request it made would be refused. Treat it as
+    // signed out so the user gets a login screen instead of a wall of
+    // errors.
     bool isLoggedIn =
-        prefs.getBool("isLoggedIn") ?? false;
+        (prefs.getBool("isLoggedIn") ?? false) &&
+            AuthService.token != null;
 
     if (!isLoggedIn) {
       if (!mounted) return;

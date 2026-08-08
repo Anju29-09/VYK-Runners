@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../services/login_service.dart';
+import '../../services/auth_service.dart';
 
 import '../coach/coach_dashboard.dart';
 import '../player/player_dashboard.dart';
@@ -252,15 +252,39 @@ class _LoginScreenState extends State<LoginScreen> {
                           // COACH LOGIN
                           // -------------------------------
 
-                          if (coachCode == "Prathamesh@123") {
+                          // The code is no longer compared here. It is sent
+                          // to the Apps Script, which holds the real one in
+                          // Script Properties and answers with a signed
+                          // token. Nothing secret ships inside the app, so
+                          // reading the source no longer reveals it.
+                          if (coachCode.isNotEmpty) {
+                            setState(() {
+                              isLoading = true;
+                            });
+
+                            final result =
+                            await AuthService.loginCoach(coachCode);
+
+                            if (!mounted) return;
+
+                            setState(() {
+                              isLoading = false;
+                            });
+
+                            if (!result.ok) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(
+                                SnackBar(
+                                  content: Text(result.message),
+                                ),
+                              );
+
+                              return;
+                            }
+
                             await prefs.setBool(
                               "isLoggedIn",
                               true,
-                            );
-
-                            await prefs.setString(
-                              "userType",
-                              "coach",
                             );
 
                             if (!mounted) return;
@@ -301,9 +325,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             isLoading = true;
                           });
 
-                          final player =
-                          await LoginService()
-                              .verifyPlayer(email);
+                          // The sheet is searched on the server now. The
+                          // whole player list is no longer downloaded to
+                          // the phone just to check one email against it.
+                          final result =
+                          await AuthService.loginPlayer(email);
+
+                          if (!mounted) return;
 
                           setState(() {
                             isLoading = false;
@@ -313,25 +341,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           // PLAYER FOUND
                           // -------------------------------
 
-                          if (player != null) {
+                          if (result.ok) {
                             final String playerName =
-                                player["playerName"]
-                                    ?.toString() ??
-                                    "";
+                                result.playerName;
 
                             final String playerEmail =
-                                player["playerEmail"]
-                                    ?.toString() ??
-                                    email;
+                                result.playerEmail.isNotEmpty
+                                    ? result.playerEmail
+                                    : email;
 
                             await prefs.setBool(
                               "isLoggedIn",
                               true,
-                            );
-
-                            await prefs.setString(
-                              "userType",
-                              "player",
                             );
 
                             await prefs.setString(
@@ -365,11 +386,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           else {
                             if (!mounted) return;
 
+                            // The server says why - unknown email, or the
+                            // script not being reachable. Reporting its
+                            // message beats always blaming the email.
                             ScaffoldMessenger.of(context)
                                 .showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(
-                                  "Email Not Registered",
+                                  result.message.isNotEmpty
+                                      ? result.message
+                                      : "Email Not Registered",
                                 ),
                               ),
                             );

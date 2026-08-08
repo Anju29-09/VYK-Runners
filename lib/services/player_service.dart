@@ -6,6 +6,7 @@ import '../models/player_model.dart';
 import '../models/fee_model.dart';
 import '../models/competition_model.dart';
 import '../models/salary_model.dart';
+import 'auth_service.dart';
 
 /// One cached response plus the time it arrived.
 class _CacheEntry {
@@ -54,6 +55,59 @@ class PlayerService {
     _bootstrap = null;
   }
 
+  //---------------- AUTHENTICATED REQUESTS ----------------//
+
+  /// The request URL with the session token added.
+  ///
+  /// Built through [Uri] rather than string joining because some queries
+  /// already carry a parameter and some are empty, so whether a `?` or an
+  /// `&` is needed differs per call.
+  static Uri _uri(String query) {
+    final base = Uri.parse("$url$query");
+
+    final token = AuthService.token;
+
+    if (token == null || token.isEmpty) {
+      return base;
+    }
+
+    return base.replace(
+      queryParameters: {
+        ...base.queryParameters,
+        "token": token,
+      },
+    );
+  }
+
+  /// Form fields with the session token added.
+  ///
+  /// Kept as a map so the http package still sends this form encoded. A
+  /// JSON body would trigger a CORS preflight, which Apps Script cannot
+  /// answer, and the web build would stop working.
+  static Map<String, String> _body(Map<String, String> fields) {
+    final token = AuthService.token;
+
+    if (token == null || token.isEmpty) {
+      return fields;
+    }
+
+    return {...fields, "token": token};
+  }
+
+  /// Recognises the server refusing the token so callers can react, rather
+  /// than letting a rejection surface as a confusing type error when an
+  /// error object arrives where a list was expected.
+  static void _checkAuth(dynamic decoded) {
+    if (decoded is Map && decoded["code"] == "AUTH_REQUIRED") {
+      // Sends the user back to login rather than leaving every screen to
+      // report its own failure. Not awaited: the throw below is what the
+      // caller needs, and the redirect happens alongside it.
+      AuthService.handleExpired();
+
+      throw const AuthExpired();
+    }
+  }
+
   //---------------- LOAD EVERYTHING AT ONCE ----------------//
 
   /// Fills every cache from a single request to `?all=true`.
@@ -87,13 +141,15 @@ class PlayerService {
   }
 
   Future<void> _downloadAll() async {
-    final response = await http.get(Uri.parse("$url?all=true"));
+    final response = await http.get(_uri("?all=true"));
 
     if (response.statusCode != 200) {
       throw Exception("Unable to load data");
     }
 
     final decoded = jsonDecode(response.body);
+
+    _checkAuth(decoded);
 
     // An older deployment without the combined endpoint answers with the
     // player list instead. Leave the caches alone and let each screen
@@ -124,13 +180,17 @@ class PlayerService {
       String key,
       String query,
       ) async {
-    final response = await http.get(Uri.parse("$url$query"));
+    final response = await http.get(_uri(query));
 
     if (response.statusCode != 200) {
       throw Exception("Unable to load $key");
     }
 
-    final List data = jsonDecode(response.body);
+    final decoded = jsonDecode(response.body);
+
+    _checkAuth(decoded);
+
+    final List data = decoded;
 
     _cache[key] = _CacheEntry(data, DateTime.now());
 
@@ -259,10 +319,10 @@ class PlayerService {
   Future<bool> deletePlayer(String id) async {
     final response = await http.post(
       Uri.parse(url),
-      body: {
+      body: _body({
         "type": "deletePlayer",
         "id": id,
-      },
+      }),
     );
 
     _cache.remove(_playersKey);
@@ -283,13 +343,13 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body: {
+      body: _body({
         "type": "attendance",
         "date": date,
         "player": player,
         "group": group,
         "status": status,
-      },
+      }),
 
     );
 
@@ -327,10 +387,10 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body: {
+      body: _body({
         "type": "deleteAttendance",
         "date": date,
-      },
+      }),
 
     );
 
@@ -374,7 +434,7 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body:{
+      body: _body({
 
         "type":"updateFees",
 
@@ -384,7 +444,7 @@ class PlayerService {
 
         "status":status,
 
-      },
+      }),
 
     );
 
@@ -404,13 +464,13 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body:{
+      body: _body({
 
         "type":"deleteFees",
 
         "id":id,
 
-      },
+      }),
 
     );
 
@@ -469,7 +529,7 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body: {
+      body: _body({
 
         "type": "competition",
 
@@ -483,7 +543,7 @@ class PlayerService {
 
         "result": competition.result,
 
-      },
+      }),
 
     );
 
@@ -500,13 +560,13 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body: {
+      body: _body({
 
         "type": "deleteCompetition",
 
         "id": id,
 
-      },
+      }),
 
     );
 
@@ -565,7 +625,7 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body: {
+      body: _body({
 
         "type": "salary",
 
@@ -575,7 +635,7 @@ class PlayerService {
 
         "amount": amount,
 
-      },
+      }),
 
     );
 
@@ -591,13 +651,13 @@ class PlayerService {
 
       Uri.parse(url),
 
-      body: {
+      body: _body({
 
         "type": "deleteSalary",
 
         "id": id,
 
-      },
+      }),
 
     );
 
