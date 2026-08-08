@@ -37,12 +37,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # enablement turns Pages on for the repository the first time this
-      # runs, so no manual switch has to be flipped in Settings.
+      # Reads the Pages config for this repo. It cannot switch Pages on:
+      # creating the site is an account level action the automatic workflow
+      # token is not allowed to perform, so Settings -> Pages -> Source has
+      # to be set to GitHub Actions once, by hand, before this can pass.
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       # The site is served from /VYK-Runners/ rather than the domain root,
       # so the base href has to match or every asset request 404s.
